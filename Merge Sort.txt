@@ -1,0 +1,233 @@
+INCLUDE Irvine32.inc
+.data 
+	M1 BYTE "Array Before Merge Sort : ", 0
+	M2 BYTE "Array After Merge Sort : ", 0
+	arr DWORD -9, -64, -57, 81, 24,-98, 79, -59, -44, 19 , 52, -60, -51, -63, 23, -22, -37, 13, 88, 36
+	arrLen DWORD $ - arr
+	aux DWORD 5 DUP(0)
+
+;variable definitions
+	a textequ <esi>
+	i textequ <eax>
+	j textequ <ebx>
+	k textequ <edi>
+	l textequ <ebp>
+	m textequ <edx>
+	r textequ <ecx>
+
+.code
+main PROC
+
+mov edx, OFFSET M1
+call WriteString
+call Crlf
+call Crlf
+
+push arrLen
+push OFFSET arr
+call printArr
+call Crlf
+call Crlf
+call Crlf
+
+mov eax, arrLen
+shr eax, 2
+dec eax
+push eax
+push 0
+push OFFSET arr
+call mergeSort
+
+mov edx, OFFSET M2
+call WriteString
+call Crlf
+call Crlf
+push arrLen
+push OFFSET arr
+call printArr
+call Crlf
+
+exit
+main ENDP
+
+	merge PROC USES eax ebx ecx edx esi edi ebp
+	;take in params. High level code conversion:
+	;  * i = eax   | * &arr = esi
+	;  * m = edx   |   k = edi
+	;    r = ecx   |   l = ebp
+	;  * j = ebx
+	;  NOTE: '*' means that the value is passed into the process.
+
+	mov a, [esp + 32]
+	mov i, [esp + 36]
+	mov m, [esp + 40]
+	mov j, [esp + 44]
+
+	;calculate additional variables: ecx, edi, ebp
+	mov l, i
+	mov k, i
+	mov r, m
+	inc r
+
+	;while loop 1 of 3
+	While1:
+	cmp l, m
+	jg afterWhile1
+	cmp r, j
+	jg afterWhile1
+
+	;if cond1 && cond2 (need to push pop eax and ebx to compare
+	;since we are out of general use registers!
+	push ebx
+	push eax
+	mov eax, [a + 4 * l]
+	mov ebx, [a + 4 * r]
+	cmp eax, ebx
+	jge While1_else
+
+
+	;do "if condition success" commands
+	mov eax, [a + 4 * l]
+	xchg [aux +  4 * k], eax
+	inc l
+	inc k
+
+	;restore registers
+	pop eax
+	pop ebx
+
+	jmp While1
+
+	While1_else:
+	;do "if condition failure" commands
+	mov eax, [a +  4 * r]
+	mov [aux + 4 * k], eax
+	inc r
+	inc k
+
+	;restore registers from above
+	pop eax
+	pop ebx
+
+	jmp While1
+
+	afterWhile1:
+	;push eax for popping later after BOTH the
+	;second and third while loop.
+	push eax
+
+	;while loop 2 of 3
+	While2:
+
+	;terminating condition
+	cmp l, m
+	jg While3
+
+	mov eax, [a + 4 * l]
+	mov [aux + 4 * k], eax
+	inc l
+	inc k
+	jmp While2
+
+	;final While loop
+	While3:
+
+	;terminating condition
+	cmp r, j
+	jg afterWhileLoops
+
+	mov eax, [a + 4 * r]
+	mov [aux + 4 * k], eax
+	inc r
+	inc k
+	jmp While3
+
+	afterWhileLoops:
+	;pop eax, since we are done with
+	;while loops 2 and 3.
+	pop eax
+
+	;set k = i
+	mov k, i
+
+	forLoop1:
+	;check if k <= j]
+	cmp k, j
+	jg endMergeProc
+
+	;sacrifice the value of m (edx), since we are
+	;not using it, nor will need it in the future.
+	mov m, [aux + 4 * k]
+	mov [a + 4 * k], m
+
+	inc k
+	jmp forLoop1
+
+
+	endMergeProc:
+	ret 16
+	merge ENDP
+
+	mergeSort PROC USES eax ebx edx esi
+	;take in params
+	mov a, [esp + 20] ;array address
+	mov i, [esp + 24] ;begin of merge
+	mov j, [esp + 28] ;end of merge
+
+	;return condition: start and end are equal.
+	cmp i, j
+	je endMergeSort
+
+	;edx = midpoint of eax, ebx
+	mov m, i
+	add m, j
+	shr m, 1
+
+	;do recursion part 1.
+	push m
+	push i
+	push a
+	call mergeSort
+
+	;do recursion part 2.
+	inc m
+	push j
+	push m
+	push a
+	call mergeSort
+
+	;call merge fn (&a, i, m, j)
+	dec m
+	push j
+	push m
+	push i
+	push a
+	call merge
+
+	endMergeSort:
+	ret 12
+	mergeSort ENDP
+
+	printArr PROC USES esi eax ebx ecx
+	mov esi, [esp + 20] ;array address
+	mov ecx, [esp + 24] ;array length
+	xor eax, eax
+	xor ebx, ebx
+
+	printElements:
+
+	cmp ebx, ecx
+	jge endPrintArr
+
+	mov eax, [esi + 1 * ebx]
+	call writeInt
+	mov al, ' '
+	call writeChar
+	add ebx, 4
+	jmp printElements
+
+	endPrintArr:
+	ret 8
+	printArr ENDP
+
+END main
